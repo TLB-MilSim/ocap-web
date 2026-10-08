@@ -1690,3 +1690,47 @@
     padding-block: 0.75rem;
   }
 }
+
+/* Phones: a two-column list (mission + date); the other columns live in the
+   detail panel, which opens full-screen under the TLB bar instead of beside
+   the table. `!important` beats the inline grid-template-columns set from
+   gridColumns() in RecordingSelector.tsx. */
+@media (max-width: 700px) {
+  .tableHeader,
+  .missionRow {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    column-gap: 12px;
+  }
+
+  .tableHeader > :nth-child(n + 3),
+  .missionRow > :nth-child(n + 3) {
+    display: none;
+  }
+
+  .tableHeader,
+  .missionRow {
+    padding-inline: 14px;
+  }
+
+  .rowDate {
+    align-items: flex-end;
+    text-align: right;
+  }
+
+  .sidebar {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    width: auto;
+    border-radius: 0;
+    border: 0;
+  }
+
+  .footerCenter,
+  .footerRight,
+  .footerVersions,
+  .footerMadeWith,
+  .dividerShort {
+    display: none;
+  }
+}
