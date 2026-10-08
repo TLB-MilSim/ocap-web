@@ -117,11 +117,86 @@
 
 .tlb-sb a:focus-visible, .tlb-sb .tlb-sb-icon:focus-visible { outline: 2px solid var(--amber, #F2A03D); outline-offset: -2px; }
 
+/* Account: sign-in button, or avatar + name with a small menu */
+.tlb-sb .tlb-sb-signin {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  height: 2rem;
+  padding: 0 .75rem;
+  color: #fff;
+  background: #5865F2;
+  border-radius: var(--radius-md, 8px);
+  font-size: .74rem;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.tlb-sb .tlb-sb-signin:hover { color: #fff; background: #4752C4; }
+.tlb-sb-account { position: relative; }
+.tlb-sb .tlb-sb-user {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  height: 2rem;
+  padding: 0 .55rem 0 .25rem;
+  color: var(--text, #EDEAE4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill, 999px);
+  cursor: pointer;
+  font-family: var(--font-body, "IBM Plex Sans", system-ui, sans-serif);
+  font-size: .78rem;
+  font-weight: 500;
+}
+.tlb-sb .tlb-sb-user:hover, .tlb-sb .tlb-sb-user[aria-expanded="true"] { background: var(--surface-hover, #221F1B); border-color: var(--line, #2E2A24); }
+.tlb-sb .tlb-sb-user:focus-visible { outline: 2px solid var(--amber, #F2A03D); outline-offset: 1px; }
+.tlb-sb-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.55rem;
+  height: 1.55rem;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong, #403A32);
+  background: var(--surface-raised, #1D1B18);
+  color: var(--amber, #F2A03D);
+  font: 700 .7rem var(--mono, "IBM Plex Mono", ui-monospace, monospace);
+}
+.tlb-sb-user-name { max-width: 10rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tlb-sb-account-menu {
+  position: absolute;
+  top: calc(100% + .45rem);
+  right: 0;
+  min-width: 13rem;
+  padding: .35rem;
+  background: var(--sidebar-bg, #0E0D0B);
+  border: 1px solid var(--line, #2E2A24);
+  border-radius: var(--radius-lg, 10px);
+  box-shadow: var(--shadow-overlay, 0 18px 44px #000000B3);
+}
+.tlb-sb-account-menu[hidden] { display: none; }
+.tlb-sb-account-head { padding: .55rem .65rem .6rem; margin-bottom: .25rem; border-bottom: 1px solid var(--line, #2E2A24); }
+.tlb-sb-account-head strong { display: block; color: var(--text, #EDEAE4); font-family: var(--font-body, system-ui, sans-serif); font-size: .85rem; }
+.tlb-sb-account-head small { color: var(--subtle, #8B847A); font-family: var(--mono, ui-monospace, monospace); font-size: .66rem; }
+.tlb-sb-account-menu a {
+  display: block;
+  padding: .55rem .65rem;
+  color: var(--text-body, #CFC9BE);
+  border-radius: var(--radius-sm, 6px);
+  font-family: var(--font-body, system-ui, sans-serif);
+  font-size: .82rem;
+}
+.tlb-sb-account-menu a:hover { color: var(--text, #EDEAE4); background: var(--surface-hover, #221F1B); }
+
 /* Phones: links move into a drop-down panel */
 @media (max-width: 760px) {
   .tlb-sb { gap: .75rem; padding: 0 .5rem 0 1rem; }
   .tlb-sb-brand { border-right: 0; padding-right: 0; }
   .tlb-sb-site { display: none; }
+  .tlb-sb-user-name, .tlb-sb .tlb-sb-signin span { display: none; }
+  .tlb-sb .tlb-sb-signin { padding: 0 .55rem; }
   .tlb-sb .tlb-sb-menu { display: inline-grid; }
   .tlb-sb-nav {
     display: none;

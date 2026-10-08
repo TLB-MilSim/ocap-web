@@ -39,8 +39,31 @@
     { id: 'ocap', label: 'OCAP', live: 'https://ocap.tlbmilsim.com/', local: 'http://localhost:5000/' }
   ];
   var SITE = { label: 'tlbmilsim.com', href: 'https://tlbmilsim.com/' };
+  // Shared Discord sign-in service (auth/).
+  var AUTH = { live: 'https://auth.tlbmilsim.com/', local: 'http://localhost:5100/' };
 
   function urlFor(app) { return isLive ? app.live : app.local; }
+
+  // ---- Signed-in user ------------------------------------------------------
+  // tlb_user is a display-only cookie (name, avatar, Steam linked) written by the
+  // auth service next to its HttpOnly session cookie. Apps never trust it for access.
+  function signedInUser() {
+    var match = document.cookie.match(/(?:^|;\s*)tlb_user=([A-Za-z0-9_-]+)/);
+    if (!match) return null;
+    try {
+      var b64 = match[1].replace(/-/g, '+').replace(/_/g, '/');
+      var bytes = Uint8Array.from(atob(b64 + '==='.slice((b64.length + 3) % 4)), function (c) { return c.charCodeAt(0); });
+      var user = JSON.parse(new TextDecoder().decode(bytes));
+      return user && typeof user.name === 'string' ? user : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function authUrl(path, returnTo) {
+    var url = (isLive ? AUTH.live : AUTH.local) + path;
+    return returnTo ? url + '?returnUrl=' + encodeURIComponent(returnTo) : url;
+  }
 
   // ---- Theme ---------------------------------------------------------------
   var COOKIE = 'tlb-theme';
@@ -90,6 +113,30 @@
     });
   }
 
+  var ICON_DISCORD = '<path d="M8.5 15.5c2.3 1 4.7 1 7 0M7 7.5c3.3-1.3 6.7-1.3 10 0 1.6 2.4 2.4 5 2.3 8-1.2 1-2.5 1.6-3.8 2l-1-1.6M7 7.5c-1.6 2.4-2.4 5-2.3 8 1.2 1 2.5 1.6 3.8 2l1-1.6"/><circle cx="9.5" cy="12" r=".8"/><circle cx="14.5" cy="12" r=".8"/>';
+
+  var user = signedInUser();
+  var account;
+  if (user) {
+    var avatar = typeof user.avatar === 'string' && user.avatar.indexOf('https://cdn.discordapp.com/') === 0
+      ? '<img class="tlb-sb-avatar" src="' + escape(user.avatar) + '" alt="">'
+      : '<span class="tlb-sb-avatar">' + escape(user.name.charAt(0).toUpperCase()) + '</span>';
+    account =
+      '<div class="tlb-sb-account">' +
+        '<button type="button" class="tlb-sb-user" aria-haspopup="menu" aria-expanded="false" title="' + escape(user.name) + '">' +
+          avatar + '<span class="tlb-sb-user-name">' + escape(user.name) + '</span>' +
+        '</button>' +
+        '<div class="tlb-sb-account-menu" role="menu" hidden>' +
+          '<div class="tlb-sb-account-head"><strong>' + escape(user.name) + '</strong>' +
+            '<small>' + (user.steam ? 'Discord · Steam linked' : 'Discord · Steam not linked') + '</small></div>' +
+          '<a role="menuitem" href="' + escape(authUrl('')) + '">' + (user.steam ? 'Account' : 'Account · link Steam') + '</a>' +
+          '<a role="menuitem" href="' + escape(authUrl('logout', location.href)) + '">Sign out</a>' +
+        '</div>' +
+      '</div>';
+  } else {
+    account = '<a class="tlb-sb-signin" href="' + escape(authUrl('login', location.href)) + '">' + svg(ICON_DISCORD, 16) + '<span>Sign in</span></a>';
+  }
+
   var hub = APPS[0];
   var links = APPS.map(function (app) {
     var current = app.id === currentApp ? ' aria-current="page"' : '';
@@ -110,6 +157,7 @@
     '<div class="tlb-sb-tools">' +
       '<a class="tlb-sb-site" href="' + SITE.href + '">' + SITE.label + svg(ICON_EXT, 12) + '</a>' +
       (showThemeToggle ? '<button type="button" class="tlb-sb-icon" data-tlb-theme></button>' : '') +
+      account +
       '<button type="button" class="tlb-sb-icon tlb-sb-menu" aria-label="Open navigation" aria-controls="tlb-sb-nav" aria-expanded="false">' + svg(ICON_MENU, 18) + '</button>' +
     '</div>';
 
@@ -145,8 +193,23 @@
     menuButton.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
   }
   menuButton.addEventListener('click', function () { setMenu(!bar.classList.contains('tlb-sb--open')); });
-  document.addEventListener('click', function (event) { if (!bar.contains(event.target)) setMenu(false); });
-  document.addEventListener('keydown', function (event) { if (event.key === 'Escape') setMenu(false); });
+
+  var userButton = bar.querySelector('.tlb-sb-user');
+  var accountMenu = bar.querySelector('.tlb-sb-account-menu');
+  function setAccountMenu(open) {
+    if (!userButton) return;
+    accountMenu.hidden = !open;
+    userButton.setAttribute('aria-expanded', String(open));
+  }
+  if (userButton) userButton.addEventListener('click', function () { setAccountMenu(accountMenu.hidden); });
+
+  document.addEventListener('click', function (event) {
+    if (!bar.contains(event.target)) setMenu(false);
+    if (userButton && !userButton.parentNode.contains(event.target)) setAccountMenu(false);
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') { setMenu(false); setAccountMenu(false); }
+  });
 
   renderThemeButton();
 
@@ -154,5 +217,5 @@
   if (document.body) mount();
   else document.addEventListener('DOMContentLoaded', mount);
 
-  window.TLBSuite = { isLive: isLive, apps: APPS, urlFor: urlFor, storedTheme: storedTheme };
+  window.TLBSuite = { isLive: isLive, apps: APPS, urlFor: urlFor, storedTheme: storedTheme, user: user, authUrl: authUrl };
 })();
