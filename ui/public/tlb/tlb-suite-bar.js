@@ -101,8 +101,8 @@
   bar.setAttribute('data-tlb-suite-bar', '');
   bar.innerHTML =
     '<a class="tlb-sb-brand" href="' + escape(urlFor(hub)) + '" aria-label="TLB MilSim hub">' +
-      '<span class="tlb-sb-mark" aria-hidden="true"></span>' +
-      '<span class="tlb-sb-brand-text"><b>TLB</b> MilSim</span>' +
+      '<span class="tlb-sb-logo" aria-hidden="true"></span>' +
+      '<span class="tlb-sb-brand-text">TLB MilSim</span>' +
     '</a>' +
     '<nav class="tlb-sb-nav" id="tlb-sb-nav" aria-label="TLB services">' + links +
       '<a class="tlb-sb-link tlb-sb-link--site" href="' + SITE.href + '">' + SITE.label + svg(ICON_EXT, 12) + '</a>' +
