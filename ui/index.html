@@ -3,12 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#100F0D" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <!-- TLB suite fonts (shared with the hub, cTab and Tac Map) -->
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <!-- Shared TLB top bar; synced from hub/suite by hub/sync-suite.ps1. Relative paths
+         follow the <base href> the server injects for prefixURL. -->
+    <link rel="stylesheet" href="tlb/tlb-suite-bar.css" vite-ignore />
     <title>OCAP2</title>
   </head>
   <body>
+    <script src="tlb/tlb-suite-bar.js" data-app="ocap" data-theme-owner="app" data-theme-toggle="off" vite-ignore></script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

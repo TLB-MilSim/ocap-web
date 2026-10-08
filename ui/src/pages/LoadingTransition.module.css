@@ -2,8 +2,8 @@
   position: fixed;
   top: 0;
   left: 0;
-  width: 100vw;
-  height: 100vh;
+  width: 100%; /* fills #root, below the TLB suite bar */
+  height: 100%;
   background: var(--bg-dark);
   display: flex;
   align-items: center;

@@ -298,7 +298,13 @@ export function RecordingSelector(): JSX.Element {
         <header class={styles.header}>
           <div class={styles.headerRow}>
             <div class={styles.logoArea}>
-              <img src={`${basePath}ocap-logo.png`} height="60" alt="OCAP" />
+              {/* TLB suite brand tile (same replay icon as the hub's OCAP card) */}
+              <span class={styles.brandIcon} aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="m10 8.5 5 3.5-5 3.5Z" />
+                </svg>
+              </span>
               <Show when={customize().websiteLogo}>
                 {(logo) => {
                   const img = <img src={logo()} height="60" alt="" />;

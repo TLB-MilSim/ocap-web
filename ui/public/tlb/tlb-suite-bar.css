@@ -1,0 +1,146 @@
+/*
+ * TLB suite bar — styles for tlb-suite-bar.js. Uses the Warm Instrument tokens
+ * (tlb-theme.css, or Tac Map's own styles.css). Every rule is scoped under
+ * .tlb-sb and resets what Bootstrap / app-wide element styles would add.
+ * Each token has a Warm Instrument fallback so the bar renders correctly in an
+ * app that defines only some of them.
+ */
+:root { --tlb-bar-h: 46px; }
+
+.tlb-sb {
+  position: sticky;
+  top: 0;
+  z-index: 2000; /* above Leaflet panes and controls (≤ 1000) */
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  box-sizing: border-box;
+  height: var(--tlb-bar-h);
+  padding: 0 1rem 0 .85rem;
+  background: var(--sidebar-bg, #0E0D0B);
+  border-bottom: 1px solid var(--line, #2E2A24);
+  font-family: var(--font-display, "Barlow Semi Condensed", "Barlow", system-ui, sans-serif);
+  line-height: 1;
+  -webkit-font-smoothing: antialiased;
+}
+.tlb-sb *, .tlb-sb *::before, .tlb-sb *::after { box-sizing: border-box; }
+.tlb-sb a, .tlb-sb a:hover { text-decoration: none; }
+.tlb-sb svg { flex: none; display: block; }
+
+/* Brand */
+.tlb-sb-brand {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  flex: none;
+  padding-right: 1.25rem;
+  border-right: 1px solid var(--line, #2E2A24);
+  height: 1.6rem;
+  color: var(--text, #EDEAE4);
+  font-size: .8rem;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.tlb-sb-brand:hover { color: var(--text, #EDEAE4); }
+.tlb-sb-brand b { color: var(--amber, #F2A03D); font-weight: 700; }
+.tlb-sb-mark {
+  position: relative;
+  display: inline-block;
+  width: 1.45rem;
+  height: 1.45rem;
+  border: 1px solid var(--amber, #F2A03D);
+  clip-path: polygon(20% 0, 100% 0, 100% 80%, 80% 100%, 0 100%, 0 20%);
+}
+.tlb-sb-mark::before, .tlb-sb-mark::after { content: ""; position: absolute; background: var(--amber, #F2A03D); }
+.tlb-sb-mark::before { width: 1px; height: 70%; left: 50%; top: 15%; }
+.tlb-sb-mark::after { height: 1px; width: 70%; left: 15%; top: 50%; }
+
+/* Service links */
+.tlb-sb-nav { display: flex; align-items: stretch; align-self: stretch; gap: .15rem; flex: 1; min-width: 0; }
+.tlb-sb-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  padding: 0 .8rem;
+  color: var(--muted, #ACA596);
+  font-size: .78rem;
+  font-weight: 600;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+.tlb-sb-link:hover { color: var(--text, #EDEAE4); background: var(--surface-hover, #221F1B); }
+.tlb-sb-link[aria-current="page"] { color: var(--amber, #F2A03D); }
+.tlb-sb-link[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  left: .8rem;
+  right: .8rem;
+  bottom: -1px;
+  height: 2px;
+  background: var(--amber, #F2A03D);
+  box-shadow: 0 0 10px var(--accent-glow, #F2A03D26);
+}
+.tlb-sb-link--site { display: none; }
+
+/* Right-hand tools */
+.tlb-sb-tools { display: flex; align-items: center; gap: .35rem; flex: none; margin-left: auto; }
+.tlb-sb-site {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  margin-right: .4rem;
+  color: var(--subtle, #8B847A);
+  font-family: var(--mono, "IBM Plex Mono", ui-monospace, Consolas, monospace);
+  font-size: .68rem;
+  letter-spacing: .04em;
+}
+.tlb-sb-site:hover { color: var(--amber, #F2A03D); }
+
+.tlb-sb .tlb-sb-icon {
+  all: unset;
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  color: var(--muted, #ACA596);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+.tlb-sb .tlb-sb-icon:hover { color: var(--text, #EDEAE4); background: var(--surface-hover, #221F1B); border-color: var(--line, #2E2A24); }
+.tlb-sb .tlb-sb-menu { display: none; }
+
+.tlb-sb a:focus-visible, .tlb-sb .tlb-sb-icon:focus-visible { outline: 2px solid var(--amber, #F2A03D); outline-offset: -2px; }
+
+/* Phones: links move into a drop-down panel */
+@media (max-width: 760px) {
+  .tlb-sb { gap: .75rem; padding: 0 .5rem 0 1rem; }
+  .tlb-sb-brand { border-right: 0; padding-right: 0; }
+  .tlb-sb-site { display: none; }
+  .tlb-sb .tlb-sb-menu { display: inline-grid; }
+  .tlb-sb-nav {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    gap: 0;
+    padding: .4rem 0;
+    background: var(--sidebar-bg, #0E0D0B);
+    border-bottom: 1px solid var(--line, #2E2A24);
+    box-shadow: var(--shadow-overlay, 0 18px 44px #000000B3);
+  }
+  .tlb-sb--open .tlb-sb-nav { display: flex; }
+  .tlb-sb-link { padding: .9rem 1.25rem; font-size: .85rem; }
+  .tlb-sb-link[aria-current="page"] { background: var(--accent-soft, #F2A03D14); }
+  .tlb-sb-link[aria-current="page"]::after { left: 0; right: auto; top: 0; bottom: 0; width: 3px; height: auto; }
+  .tlb-sb-link--site { display: flex; margin-top: .3rem; padding-top: 1rem; border-top: 1px solid var(--line, #2E2A24); font-family: var(--mono, "IBM Plex Mono", ui-monospace, Consolas, monospace); font-size: .75rem; letter-spacing: .04em; text-transform: none; }
+}
+
+@media print { .tlb-sb { display: none; } }

@@ -3,7 +3,7 @@
    ========================================================================== */
 
 .leaflet-container {
-  font-family: Roboto, Arial, sans-serif;
+  font-family: var(--font-body);
 }
 
 .leaflet-left {

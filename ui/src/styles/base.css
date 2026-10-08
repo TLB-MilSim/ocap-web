@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css?family=Roboto:400,500,700');
+/* Fonts (Barlow Semi Condensed, IBM Plex Sans/Mono) are loaded in index.html. */
 
 /* ==========================================================================
    Reset & Base Styles
@@ -16,7 +16,7 @@ body {
   height: 100%;
   margin: 0;
   padding: 0;
-  font-family: Roboto, Arial, sans-serif;
+  font-family: var(--font-body);
   color: var(--text-primary);
   overflow: hidden;
   cursor: default;
@@ -28,6 +28,25 @@ html {
 
 body {
   font-size: var(--font-size-body);
+}
+
+/* ---------- TLB suite bar ----------
+   The shared top bar (public/tlb) is the first child of <body>. The app renders
+   into #root below it; `contain: layout` makes #root the containing block for
+   the app's absolute *and* fixed elements (full-screen map, dialogs, overlays),
+   so they fill the space under the bar instead of the whole window. */
+body {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-dark);
+}
+
+#root {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  contain: layout;
 }
 
 /* ---------- Map container ---------- */

@@ -1,7 +1,7 @@
 /* ─── Layout ─────────────────────────────────────────────────────────── */
 .page {
   width: 100%;
-  min-height: 100vh;
+  min-height: 100%; /* fills #root, below the TLB suite bar */
   background: var(--bg-dark);
   color: var(--text-primary);
   font-family: var(--font-heading);
