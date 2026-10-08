@@ -415,64 +415,65 @@ export function RecordingSelector(): JSX.Element {
             </div>
           </div>
 
-          {/* ── Filter bar ── */}
-          <div class={styles.filterBar}>
-            {/* Search */}
-            <div class={styles.searchWrap}>
-              <span class={styles.searchIcon}><SearchIcon /></span>
-              <input
-                ref={searchRef}
-                data-testid="search-input"
-                type="text"
-                placeholder={t("search_placeholder")}
-                value={search()}
-                onInput={(e) => setSearch(e.currentTarget.value)}
-                class={styles.searchInput}
-              />
-              <kbd class={styles.searchKbd}>/</kbd>
-            </div>
-
-            {/* Tag filters */}
-            <div class={styles.tagFilters}>
-              <span class={styles.tagIcon}><TagIcon /></span>
-              <For each={uniqueTags()}>
-                {(tag) => (
-                  <TagBadge
-                    tag={tag}
-                    clickable
-                    active={tagFilter() === null || tagFilter() === tag}
-                    onClick={() => setTagFilter(tagFilter() === tag ? null : tag)}
-                    data-testid={`tag-filter-${tag}`}
-                  />
-                )}
-              </For>
-            </div>
-
-            {/* Map filter dropdown */}
-            <Show when={showMapFilters() && uniqueMaps().length > 1}>
-              <MapFilterDropdown
-                uniqueMaps={uniqueMaps()}
-                mapFilter={mapFilter()}
-                mapSearch={mapSearch()}
-                filteredMapOptions={filteredMapOptions()}
-                mapDropdownOpen={mapDropdownOpen()}
-                setMapDropdownOpen={setMapDropdownOpen}
-                setMapSearch={setMapSearch}
-                toggleMapFilter={toggleMapFilter}
-                worldDisplayName={worldDisplayName}
-                getMapColor={getMapColor}
-                t={t}
-              />
-            </Show>
-
-            {/* Clear */}
-            <Show when={hasFilters()}>
-              <button class={styles.clearButton} data-testid="clear-filters" onClick={clearFilters}>
-                <XIcon /> {t("clear")}
-              </button>
-            </Show>
-          </div>
         </header>
+
+        {/* ── Filter bar (outside the header so the header can be a full-width strip) ── */}
+        <div class={styles.filterBar}>
+          {/* Search */}
+          <div class={styles.searchWrap}>
+            <span class={styles.searchIcon}><SearchIcon /></span>
+            <input
+              ref={searchRef}
+              data-testid="search-input"
+              type="text"
+              placeholder={t("search_placeholder")}
+              value={search()}
+              onInput={(e) => setSearch(e.currentTarget.value)}
+              class={styles.searchInput}
+            />
+            <kbd class={styles.searchKbd}>/</kbd>
+          </div>
+
+          {/* Tag filters */}
+          <div class={styles.tagFilters}>
+            <span class={styles.tagIcon}><TagIcon /></span>
+            <For each={uniqueTags()}>
+              {(tag) => (
+                <TagBadge
+                  tag={tag}
+                  clickable
+                  active={tagFilter() === null || tagFilter() === tag}
+                  onClick={() => setTagFilter(tagFilter() === tag ? null : tag)}
+                  data-testid={`tag-filter-${tag}`}
+                />
+              )}
+            </For>
+          </div>
+
+          {/* Map filter dropdown */}
+          <Show when={showMapFilters() && uniqueMaps().length > 1}>
+            <MapFilterDropdown
+              uniqueMaps={uniqueMaps()}
+              mapFilter={mapFilter()}
+              mapSearch={mapSearch()}
+              filteredMapOptions={filteredMapOptions()}
+              mapDropdownOpen={mapDropdownOpen()}
+              setMapDropdownOpen={setMapDropdownOpen}
+              setMapSearch={setMapSearch}
+              toggleMapFilter={toggleMapFilter}
+              worldDisplayName={worldDisplayName}
+              getMapColor={getMapColor}
+              t={t}
+            />
+          </Show>
+
+          {/* Clear */}
+          <Show when={hasFilters()}>
+            <button class={styles.clearButton} data-testid="clear-filters" onClick={clearFilters}>
+              <XIcon /> {t("clear")}
+            </button>
+          </Show>
+        </div>
 
         {/* ── Upload Dialog (modal) ── */}
         <Show when={showUpload() && isAdmin()}>

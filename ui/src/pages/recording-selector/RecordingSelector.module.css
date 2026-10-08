@@ -1607,3 +1607,86 @@
     width: 280px;
   }
 }
+
+/* ── TLB suite layout ──
+   Matches the TLB hub and cTab pages: a full-width header strip, then the
+   content in a centred column, with the recordings table as a card. The column
+   is wider than cTab's (1120px) to fit the table next to the detail sidebar. */
+.page {
+  font-family: var(--font-body);
+  background: radial-gradient(120% 80% at 12% 0%, #16140F 0%, var(--bg-dark) 58%);
+}
+
+.header {
+  padding: 0;
+  background: linear-gradient(#1A1815, #171512);
+  border-bottom: var(--border-subtle);
+}
+
+.headerRow,
+.filterBar,
+.mainContent {
+  width: min(1400px, 100%);
+  margin-inline: auto;
+  padding-inline: 2rem;
+}
+
+.headerRow {
+  min-height: 4.2rem;
+  margin-bottom: 0;
+  padding-block: 0.6rem;
+}
+
+.brandIcon {
+  width: 2.1rem;
+  height: 2.1rem;
+}
+
+.brandIcon svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.title {
+  font-size: 1.15rem;
+  letter-spacing: 0.08em;
+}
+
+.filterBar {
+  padding-top: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 0;
+}
+
+.mainContent {
+  gap: 1rem;
+  padding-bottom: 1.25rem;
+}
+
+.tableArea,
+.sidebar {
+  background: var(--bg-surface);
+  border: var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 1px 2px #00000047;
+}
+
+.footer {
+  border-top: var(--border-subtle);
+}
+
+@media (max-width: 768px) {
+  .header {
+    padding: 0;
+  }
+
+  .headerRow,
+  .filterBar,
+  .mainContent {
+    padding-inline: 1rem;
+  }
+
+  .headerRow {
+    padding-block: 0.75rem;
+  }
+}
