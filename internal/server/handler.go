@@ -172,6 +172,7 @@ func NewHandler(
 	fuego.GetStd(g, "/api/v1/auth/steam", hdlr.SteamLogin, fuego.OptionTags("Auth"))
 	fuego.GetStd(g, "/api/v1/auth/steam/callback", hdlr.SteamCallback, fuego.OptionTags("Auth"))
 	fuego.PostStd(g, "/api/v1/auth/password", hdlr.PasswordLogin, fuego.OptionTags("Auth"))
+	fuego.GetStd(g, "/api/v1/auth/tlb", hdlr.TLBLogin, fuego.OptionTags("Auth")) // TLB suite sign-in (handler_tlb.go)
 	fuego.Get(g, "/api/v1/auth/me", hdlr.GetMe, fuego.OptionTags("Auth"))
 	fuego.Post(g, "/api/v1/auth/logout", hdlr.Logout, fuego.OptionTags("Auth"), fuego.OptionSecurity(bearerAuth))
 

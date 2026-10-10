@@ -60,6 +60,24 @@ type Auth struct {
 	AdminSteamIDs []string      `json:"adminSteamIds" yaml:"adminSteamIds"`
 	SteamAPIKey   string        `json:"steamApiKey" yaml:"steamApiKey"`
 	Password      string        `json:"password" yaml:"password"`
+	TLB           TLBAuth       `json:"tlb" yaml:"tlb"`
+}
+
+// TLBAuth configures the "tlb" auth mode: the shared TLB suite sign-in (see handler_tlb.go).
+type TLBAuth struct {
+	// PublicURL is the TLB auth service's public address (also the token issuer),
+	// e.g. https://auth.tlbmilsim.com/.
+	PublicURL string `json:"publicUrl" yaml:"publicUrl"`
+	// JwksURL is where to fetch the service's public keys; defaults to PublicURL.
+	JwksURL string `json:"jwksUrl" yaml:"jwksUrl"`
+}
+
+// Issuer returns PublicURL with a trailing slash, as the auth service issues it.
+func (t TLBAuth) Issuer() string {
+	if strings.HasSuffix(t.PublicURL, "/") {
+		return t.PublicURL
+	}
+	return t.PublicURL + "/"
 }
 
 type Streaming struct {
@@ -128,6 +146,8 @@ func NewSetting() (setting Setting, err error) {
 	viper.SetDefault("auth.steamApiKey", "")
 	viper.SetDefault("auth.mode", "public")
 	viper.SetDefault("auth.password", "")
+	viper.SetDefault("auth.tlb.publicUrl", "")
+	viper.SetDefault("auth.tlb.jwksUrl", "")
 
 	viper.SetDefault("cors.allowedOrigins", []string{})
 	viper.SetDefault("httpServer.readTimeout", "120s")
@@ -195,7 +215,7 @@ func NewSetting() (setting Setting, err error) {
 }
 
 func validateAuthConfig(auth Auth) error {
-	validModes := []string{"public", "password", "steam", "steamAllowlist"}
+	validModes := []string{"public", "password", "steam", "steamAllowlist", "tlb"}
 	if !slices.Contains(validModes, auth.Mode) {
 		return fmt.Errorf("auth.mode %q is not valid, must be one of: %s", auth.Mode, strings.Join(validModes, ", "))
 	}
@@ -203,6 +223,10 @@ func validateAuthConfig(auth Auth) error {
 	case "password":
 		if auth.Password == "" {
 			return fmt.Errorf("auth.mode %q requires auth.password to be set", auth.Mode)
+		}
+	case "tlb":
+		if auth.TLB.PublicURL == "" {
+			return fmt.Errorf("auth.mode %q requires auth.tlb.publicUrl to be set", auth.Mode)
 		}
 	}
 	return nil

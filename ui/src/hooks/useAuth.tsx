@@ -1,6 +1,14 @@
 import { createContext, useContext, createSignal, createMemo, onMount } from "solid-js";
 import type { JSX, Accessor } from "solid-js";
-import { ApiClient, getAuthToken } from "../data/apiClient";
+import { ApiClient, getAuthToken, setAuthToken } from "../data/apiClient";
+
+/** TLB suite top bar (public/tlb/tlb-suite-bar.js), present on every page. */
+declare global {
+  interface Window { TLBSuite?: { authUrl: (path: string, returnTo?: string) => string } }
+}
+
+/** The TLB sign-in sets a display cookie next to its session cookie; gone = signed out of the suite. */
+const tlbSignedIn = () => /(?:^|;\s*)tlb_user=/.test(document.cookie);
 
 export interface Auth {
   authenticated: Accessor<boolean>;
@@ -72,6 +80,16 @@ export function AuthProvider(props: { children: JSX.Element }): JSX.Element {
       }
     }
 
+    // TLB suite sign-in: no OCAP login screen. Without a token, or after signing out of the
+    // suite elsewhere, go through /api/v1/auth/tlb, which signs in via the TLB sign-in if needed.
+    if (authMode() === "tlb" && !error) {
+      if (!hadToken && !tlbSignedIn()) setAuthToken(null);
+      if (!getAuthToken()) {
+        window.location.href = api.getTlbLoginUrl(window.location.pathname + window.location.search);
+        return;
+      }
+    }
+
     if (!getAuthToken()) {
       setAuthenticated(false);
       return;
@@ -107,6 +125,10 @@ export function AuthProvider(props: { children: JSX.Element }): JSX.Element {
 
   const loginWithSteam = () => {
     setAuthError(null);
+    if (authMode() === "tlb") {
+      window.location.href = api.getTlbLoginUrl(window.location.pathname + window.location.search);
+      return;
+    }
     window.location.href = api.getSteamLoginUrl(
       window.location.pathname + window.location.search,
     );
@@ -121,6 +143,10 @@ export function AuthProvider(props: { children: JSX.Element }): JSX.Element {
       setSteamId(null);
       setSteamName(null);
       setSteamAvatar(null);
+    }
+    // TLB suite: sign out of the whole suite, not just OCAP.
+    if (authMode() === "tlb" && window.TLBSuite) {
+      window.location.href = window.TLBSuite.authUrl("logout", window.location.origin + "/");
     }
   };
 

@@ -364,6 +364,14 @@ export class ApiClient {
 
   // ─── Auth methods ───
 
+  /** TLB suite sign-in ("tlb" auth mode): exchanges the shared TLB session for an OCAP token. */
+  getTlbLoginUrl(returnTo?: string): string {
+    if (returnTo) {
+      sessionStorage.setItem("ocap_return_to", returnTo);
+    }
+    return `${this.baseUrl}/api/v1/auth/tlb`;
+  }
+
   getSteamLoginUrl(returnTo?: string): string {
     if (returnTo) {
       sessionStorage.setItem("ocap_return_to", returnTo);
