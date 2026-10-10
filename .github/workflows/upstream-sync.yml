@@ -1,0 +1,104 @@
+# TLB fork: weekly check for new OCAP2/web commits.
+# Merges upstream into a branch off `tlb`, runs the Go and UI tests, then opens (or updates)
+# a PR into `tlb`. On a merge conflict it opens an issue listing the conflicting files instead.
+# Nothing is merged into `tlb` automatically.
+name: Upstream sync
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency: upstream-sync
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      UPSTREAM: https://github.com/OCAP2/web.git
+      UPSTREAM_BRANCH: main
+      SYNC_BRANCH: upstream-sync
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tlb
+          fetch-depth: 0
+
+      - name: Merge upstream into a branch off tlb
+        id: merge
+        run: |
+          git config user.name "TLB upstream sync"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream "$UPSTREAM"
+          git fetch --no-tags upstream "$UPSTREAM_BRANCH"
+          new=$(git rev-list --count HEAD.."upstream/$UPSTREAM_BRANCH")
+          echo "new=$new" >> "$GITHUB_OUTPUT"
+          echo "upstream_sha=$(git rev-parse --short "upstream/$UPSTREAM_BRANCH")" >> "$GITHUB_OUTPUT"
+          if [ "$new" = 0 ]; then echo "tlb already contains upstream/$UPSTREAM_BRANCH"; exit 0; fi
+          git switch -c "$SYNC_BRANCH"
+          if git merge --no-edit "upstream/$UPSTREAM_BRANCH"; then
+            echo "result=merged" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=conflict" >> "$GITHUB_OUTPUT"
+            git diff --name-only --diff-filter=U > "$RUNNER_TEMP/conflicts.txt"
+            git merge --abort
+          fi
+
+      - uses: actions/setup-go@v5
+        if: steps.merge.outputs.result == 'merged'
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        if: steps.merge.outputs.result == 'merged'
+        with:
+          node-version: 24
+
+      - name: Test
+        id: test
+        if: steps.merge.outputs.result == 'merged'
+        continue-on-error: true
+        run: |
+          mkdir -p internal/frontend/dist && touch internal/frontend/dist/.keep
+          go vet ./... && go test ./...
+          cd ui && npm ci && npm test && npm run build
+
+      - name: Open or update the sync PR
+        if: steps.merge.outputs.result == 'merged'
+        run: |
+          git push --force origin "$SYNC_BRANCH"
+          status="✅ Go and UI tests passed"
+          [ "${{ steps.test.outcome }}" = "success" ] || status="❌ Tests failed: see the workflow run"
+          body=$(printf '%s\n\n%s\n\n%s\n%s\n' \
+            "Merges **${{ steps.merge.outputs.new }}** new commits from upstream \`OCAP2/web@${{ steps.merge.outputs.upstream_sha }}\` into \`tlb\`." \
+            "$status ([run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}))" \
+            "Before merging, check that the TLB theme, top bar and \`tlb\` sign-in still work." \
+            "Opened by the weekly *Upstream sync* workflow; it updates this PR until it is merged.")
+          number=$(gh pr list --head "$SYNC_BRANCH" --base tlb --state open --json number -q '.[0].number')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --title "Upstream sync: ${{ steps.merge.outputs.new }} new OCAP2/web commits" --body "$body"
+          elif ! gh pr create --base tlb --head "$SYNC_BRANCH" --title "Upstream sync: ${{ steps.merge.outputs.new }} new OCAP2/web commits" --body "$body"; then
+            # The organization doesn't let GitHub Actions open PRs: open an issue with a one-click link instead.
+            title="Upstream sync: new OCAP2/web commits ready"
+            link="${{ github.server_url }}/${{ github.repository }}/compare/tlb...$SYNC_BRANCH?expand=1"
+            issue_body=$(printf '%s\n\n**[Create the PR](%s)** (branch %s, updated weekly)\n' "$body" "$link" "$SYNC_BRANCH")
+            number=$(gh issue list --state open --search "\"$title\" in:title" --json number -q '.[0].number')
+            if [ -n "$number" ]; then gh issue comment "$number" --body "$issue_body"; else gh issue create --title "$title" --body "$issue_body"; fi
+          fi
+
+      - name: Report a merge conflict
+        if: steps.merge.outputs.result == 'conflict'
+        run: |
+          title="Upstream sync: merge conflict with OCAP2/web"
+          body=$(printf '%s\n\n%s\n\n%s\n' \
+            "Merging upstream \`OCAP2/web@${{ steps.merge.outputs.upstream_sha }}\` (${{ steps.merge.outputs.new }} new commits) into \`tlb\` conflicts in:" \
+            "$(sed 's/^/- `/; s/$/`/' "$RUNNER_TEMP/conflicts.txt")" \
+            "Resolve locally: \`git fetch upstream && git switch -c update/upstream tlb && git merge upstream/main\`, fix, test, then open a PR into \`tlb\`.")
+          number=$(gh issue list --state open --search "\"$title\" in:title" --json number -q '.[0].number')
+          if [ -n "$number" ]; then gh issue comment "$number" --body "$body"; else gh issue create --title "$title" --body "$body"; fi
+          exit 1
