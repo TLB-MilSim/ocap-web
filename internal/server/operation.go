@@ -36,8 +36,13 @@ type SideCounts struct {
 	Kills   int `json:"kills"`
 }
 
-// SideComposition maps Arma side names (WEST, EAST, GUER, CIV) to player/unit counts.
+// SideComposition maps Arma side names (WEST, EAST, GUER, CIV, VIRTUAL) to player/unit counts.
 type SideComposition map[string]SideCounts
+
+// CurrentStatsRevision is stored on each operation when computeStats last ran.
+// Bump it when the derived stats shape changes so completed recordings are
+// recomputed once. Revision 1 adds VIRTUAL from zeusEntity events.
+const CurrentStatsRevision = 1
 
 type Operation struct {
 	ID               int64   `json:"id"`
@@ -90,10 +95,16 @@ func NewRepoOperationWithDataDir(pathDB, dataDir string) (*RepoOperation, error)
 	}
 
 	if err := r.migration(); err != nil {
+		db.Close()
 		return nil, err
 	}
 
 	return r, nil
+}
+
+// Close closes the underlying database.
+func (r *RepoOperation) Close() error {
+	return r.db.Close()
 }
 
 // runMigration executes a set of SQL statements atomically within a transaction,
@@ -274,7 +285,97 @@ func (r *RepoOperation) migration() (err error) {
 		}
 	}
 
+	if version < 14 {
+		// Tests rewind the version table to re-run later migrations; ADD COLUMN
+		// is not idempotent, so skip it when the column already exists.
+		var n int
+		if err = r.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('operations') WHERE name = 'stats_revision'`).Scan(&n); err != nil {
+			return err
+		}
+		var stmts []string
+		if n == 0 {
+			stmts = append(stmts, `ALTER TABLE operations ADD COLUMN stats_revision INTEGER DEFAULT 0`)
+		}
+		if err = r.runMigration(14, stmts...); err != nil {
+			return err
+		}
+	}
+
+	if version < 15 {
+		// Streamed recordings remember the producer's mission id, so a mission
+		// resent in full after a web restart replaces its partial segments and
+		// a producer asking about a saved mission is told it is saved.
+		var n int
+		if err = r.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('operations') WHERE name = 'stream_mission_id'`).Scan(&n); err != nil {
+			return err
+		}
+		var stmts []string
+		if n == 0 {
+			stmts = append(stmts,
+				`ALTER TABLE operations ADD COLUMN stream_mission_id TEXT DEFAULT ''`,
+				`ALTER TABLE operations ADD COLUMN stream_ended INTEGER DEFAULT 0`,
+			)
+		}
+		stmts = append(stmts, `CREATE INDEX IF NOT EXISTS idx_operations_stream_mission_id ON operations(stream_mission_id)`)
+		if err = r.runMigration(15, stmts...); err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+// SetStreamMission records the producer mission a streamed operation belongs to.
+func (r *RepoOperation) SetStreamMission(ctx context.Context, id int64, missionID string) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE operations SET stream_mission_id = ? WHERE id = ?`, missionID, id)
+	return err
+}
+
+// MarkStreamEnded records that a streamed operation was saved through end_mission.
+func (r *RepoOperation) MarkStreamEnded(ctx context.Context, id int64) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE operations SET stream_ended = 1 WHERE id = ?`, id)
+	return err
+}
+
+// StreamEnded reports whether a recording of the producer mission was saved
+// through end_mission.
+func (r *RepoOperation) StreamEnded(ctx context.Context, missionID string) (bool, error) {
+	if missionID == "" {
+		return false, nil
+	}
+	var n int
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM operations WHERE stream_mission_id = ? AND stream_ended = 1`, missionID).Scan(&n)
+	return n > 0, err
+}
+
+// StreamSegment is an operation recorded for a producer mission.
+type StreamSegment struct {
+	ID       int64
+	Filename string
+}
+
+// StreamSegments returns the operations recorded for the producer mission,
+// except the one with id exceptID.
+func (r *RepoOperation) StreamSegments(ctx context.Context, missionID string, exceptID int64) ([]StreamSegment, error) {
+	if missionID == "" {
+		return nil, nil
+	}
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, filename FROM operations WHERE stream_mission_id = ? AND id != ? ORDER BY id`, missionID, exceptID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []StreamSegment
+	for rows.Next() {
+		var s StreamSegment
+		if err := rows.Scan(&s.ID, &s.Filename); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
 }
 
 // isInvalidStorageName reports whether name is unsafe to use as a recording's
@@ -749,6 +850,14 @@ func (r *RepoOperation) UpdateSchemaVersion(ctx context.Context, id int64, versi
 	return err
 }
 
+// UpdateStreamingMeta updates duration and player count for a live streaming operation.
+func (r *RepoOperation) UpdateStreamingMeta(ctx context.Context, id int64, duration float64, playerCount int) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE operations SET mission_duration = ?, player_count = ? WHERE id = ?`,
+		duration, playerCount, id)
+	return err
+}
+
 // UpdateMissionDuration updates the mission duration for an operation
 func (r *RepoOperation) UpdateMissionDuration(ctx context.Context, id int64, duration float64) error {
 	_, err := r.db.ExecContext(ctx,
@@ -767,8 +876,8 @@ func (r *RepoOperation) UpdateChunkCount(ctx context.Context, id int64, count in
 func (r *RepoOperation) UpdateOperationStats(ctx context.Context, id int64, playerCount, killCount, playerKillCount int, sideComposition SideComposition) error {
 	sideJSON := marshalSideComposition(sideComposition)
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE operations SET player_count = ?, kill_count = ?, player_kill_count = ?, side_composition = ? WHERE id = ?`,
-		playerCount, killCount, playerKillCount, sideJSON, id)
+		`UPDATE operations SET player_count = ?, kill_count = ?, player_kill_count = ?, side_composition = ?, stats_revision = ? WHERE id = ?`,
+		playerCount, killCount, playerKillCount, sideJSON, CurrentStatsRevision, id)
 	return err
 }
 
@@ -805,13 +914,32 @@ func unmarshalSideComposition(raw string) SideComposition {
 	return sc
 }
 
-// SelectStatsBackfill returns completed protobuf operations that have no stats yet
+// Update writes the streaming-finalize mutable fields for an existing operation.
+// Stats columns (player_count, kill_count, side_composition, player_kill_count)
+// are owned by UpdateStreamingMeta / UpdateOperationStats and not touched here.
+func (r *RepoOperation) Update(ctx context.Context, op *Operation) error {
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE operations SET
+			world_name = ?, mission_name = ?, mission_duration = ?, filename = ?,
+			date = ?, tag = ?, storage_format = ?, conversion_status = ?,
+			schema_version = ?, chunk_count = ?, focus_start = ?, focus_end = ?
+		WHERE id = ?`,
+		op.WorldName, op.MissionName, op.MissionDuration, op.Filename,
+		op.Date, op.Tag, op.StorageFormat, op.ConversionStatus,
+		op.SchemaVersion, op.ChunkCount, op.FocusStart, op.FocusEnd, op.ID)
+	return err
+}
+
+// SelectStatsBackfill returns completed operations whose derived stats are stale
+// or missing. stats_revision is bumped by UpdateOperationStats so each
+// computeStats change is applied once, including recordings that already have
+// a player_count (they would otherwise keep the pre-VIRTUAL composition forever).
 func (r *RepoOperation) SelectStatsBackfill(ctx context.Context) ([]Operation, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT ` + operationColumns + `
 		 FROM operations
-		 WHERE conversion_status = 'completed' AND player_count = 0
-		 ORDER BY id ASC`)
+		 WHERE conversion_status = 'completed' AND stats_revision < ?
+		 ORDER BY id ASC`, CurrentStatsRevision)
 	if err != nil {
 		return nil, err
 	}
