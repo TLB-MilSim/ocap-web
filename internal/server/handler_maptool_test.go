@@ -583,7 +583,7 @@ func TestMapToolEventStream_QueryToken(t *testing.T) {
 	t.Cleanup(func() { cancel(); <-done })
 
 	jwt := NewJWTManager("test-secret", time.Hour)
-	token, err := jwt.Create("")
+	token, err := jwt.Create("", WithRole("admin"))
 	require.NoError(t, err)
 
 	hdlr := &Handler{
@@ -659,7 +659,7 @@ func TestMapToolEventStream_BearerToken(t *testing.T) {
 	t.Cleanup(func() { cancel(); <-done })
 
 	jwt := NewJWTManager("test-secret", time.Hour)
-	token, err := jwt.Create("")
+	token, err := jwt.Create("", WithRole("admin"))
 	require.NoError(t, err)
 
 	hdlr := &Handler{
@@ -757,7 +757,7 @@ func TestMapToolEventStream_ChannelClosed(t *testing.T) {
 	t.Cleanup(func() { cancel(); <-done })
 
 	jwt := NewJWTManager("test-secret", time.Hour)
-	token, err := jwt.Create("")
+	token, err := jwt.Create("", WithRole("admin"))
 	require.NoError(t, err)
 
 	hdlr := &Handler{
@@ -815,7 +815,7 @@ func TestMapToolEventStream_FlusherNotSupported(t *testing.T) {
 	t.Cleanup(func() { cancel(); <-done })
 
 	jwt := NewJWTManager("test-secret", time.Hour)
-	token, err := jwt.Create("")
+	token, err := jwt.Create("", WithRole("admin"))
 	require.NoError(t, err)
 
 	hdlr := &Handler{

@@ -16,16 +16,21 @@ docs/
 /ocap-webserver
 /ocap-webserver.exe
 
-# Runtime data
-data.db
+# Runtime data (ui/src/data is source, so the folders stay root-only;
+# databases, logs and keys are excluded anywhere, e.g. left behind by tests)
 data/
 maps/
-*.log
+internal/server/data/
+internal/server/maps/
+**/*.db
+**/*.log
 
 # Frontend build artifacts
 **/node_modules
 ui/dist
 internal/frontend/dist
 
-# Local config
-setting.json
+# Local config and secrets
+**/setting.json
+**/.env
+**/*.key

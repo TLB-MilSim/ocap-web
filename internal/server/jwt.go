@@ -63,6 +63,15 @@ func WithRole(role string) ClaimOption {
 	}
 }
 
+// WithExpiresBefore caps the token's expiry at t (e.g. the session it was exchanged from).
+func WithExpiresBefore(t time.Time) ClaimOption {
+	return func(c *SteamClaims) {
+		if c.ExpiresAt == nil || t.Before(c.ExpiresAt.Time) {
+			c.ExpiresAt = jwt.NewNumericDate(t)
+		}
+	}
+}
+
 // Validate parses the token and checks signature and expiry.
 func (m *JWTManager) Validate(tokenString string) error {
 	_, err := jwt.Parse(tokenString, func(t *jwt.Token) (any, error) {
@@ -70,7 +79,7 @@ func (m *JWTManager) Validate(tokenString string) error {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
 		return m.secret, nil
-	})
+	}, jwt.WithValidMethods([]string{"HS256"}), jwt.WithExpirationRequired())
 	return err
 }
 
@@ -95,7 +104,7 @@ func (m *JWTManager) parseClaims(tokenString string) *SteamClaims {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
 		return m.secret, nil
-	})
+	}, jwt.WithValidMethods([]string{"HS256"}), jwt.WithExpirationRequired())
 	if err != nil || !token.Valid {
 		return nil
 	}

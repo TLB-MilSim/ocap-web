@@ -22,7 +22,7 @@ func (h *Handler) HandleStream(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	if r.URL.Query().Get("secret") != h.setting.Secret {
+	if !secretMatches(r.URL.Query().Get("secret"), h.setting.Secret) {
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}

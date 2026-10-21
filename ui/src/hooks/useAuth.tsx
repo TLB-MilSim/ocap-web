@@ -57,6 +57,9 @@ export function AuthProvider(props: { children: JSX.Element }): JSX.Element {
 
     // Read query params from Steam callback redirect
     const params = new URLSearchParams(window.location.search);
+    // The TLB sign-in returns the token in the URL fragment, which browsers never send to servers.
+    const hashToken = new URLSearchParams(window.location.hash.slice(1)).get("auth_token");
+    if (hashToken) params.set("auth_token", hashToken);
 
     const error = params.get("auth_error");
     if (error) {
@@ -96,6 +99,12 @@ export function AuthProvider(props: { children: JSX.Element }): JSX.Element {
     }
     try {
       const state = await api.getMe();
+      if (!state.authenticated && authMode() === "tlb" && !hadToken && !error) {
+        // The TLB session ended or changed (signed out, blocked, role removed): sign in again.
+        setAuthToken(null);
+        window.location.href = api.getTlbLoginUrl(window.location.pathname + window.location.search);
+        return;
+      }
       setAuthenticated(state.authenticated);
       setRole(state.role ?? null);
       setSteamId(state.steamId ?? null);

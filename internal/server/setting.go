@@ -1,6 +1,8 @@
 package server
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -61,6 +63,17 @@ type Auth struct {
 	SteamAPIKey   string        `json:"steamApiKey" yaml:"steamApiKey"`
 	Password      string        `json:"password" yaml:"password"`
 	TLB           TLBAuth       `json:"tlb" yaml:"tlb"`
+	// JWTSecret signs OCAP's own sign-in tokens. When unset, NewSetting loads (or creates)
+	// a random key in jwt.key next to the database, so it is never the upload secret.
+	JWTSecret string `json:"jwtSecret" yaml:"jwtSecret"`
+}
+
+// jwtKey is the key OCAP's sign-in tokens are signed with.
+func (s Setting) jwtKey() string {
+	if s.Auth.JWTSecret != "" {
+		return s.Auth.JWTSecret
+	}
+	return s.Secret
 }
 
 // TLBAuth configures the "tlb" auth mode: the shared TLB suite sign-in (see handler_tlb.go).
@@ -70,6 +83,8 @@ type TLBAuth struct {
 	PublicURL string `json:"publicUrl" yaml:"publicUrl"`
 	// JwksURL is where to fetch the service's public keys; defaults to PublicURL.
 	JwksURL string `json:"jwksUrl" yaml:"jwksUrl"`
+	// VerifyURL is the service's live session check; defaults to PublicURL + "verify".
+	VerifyURL string `json:"verifyUrl" yaml:"verifyUrl"`
 }
 
 // Issuer returns PublicURL with a trailing slash, as the auth service issues it.
@@ -148,6 +163,8 @@ func NewSetting() (setting Setting, err error) {
 	viper.SetDefault("auth.password", "")
 	viper.SetDefault("auth.tlb.publicUrl", "")
 	viper.SetDefault("auth.tlb.jwksUrl", "")
+	viper.SetDefault("auth.tlb.verifyUrl", "")
+	viper.SetDefault("auth.jwtSecret", "")
 
 	viper.SetDefault("cors.allowedOrigins", []string{})
 	viper.SetDefault("httpServer.readTimeout", "120s")
@@ -211,7 +228,34 @@ func NewSetting() (setting Setting, err error) {
 		return setting, fmt.Errorf("change the `secret` value to your own")
 	}
 
+	if setting.Auth.JWTSecret == "" {
+		if setting.Auth.JWTSecret, err = loadOrCreateJWTKey(filepath.Join(filepath.Dir(setting.DB), "jwt.key")); err != nil {
+			return setting, err
+		}
+	}
+
 	return
+}
+
+// loadOrCreateJWTKey reads the token signing key from path, creating a random one on first start.
+// Deleting the file signs everyone out of OCAP.
+func loadOrCreateJWTKey(path string) (string, error) {
+	if b, err := os.ReadFile(path); err == nil {
+		if key := strings.TrimSpace(string(b)); len(key) >= 32 {
+			return key, nil
+		}
+	} else if !os.IsNotExist(err) {
+		return "", fmt.Errorf("read JWT key: %w", err)
+	}
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", fmt.Errorf("generate JWT key: %w", err)
+	}
+	key := hex.EncodeToString(buf)
+	if err := os.WriteFile(path, []byte(key+"\n"), 0600); err != nil {
+		return "", fmt.Errorf("write JWT key: %w", err)
+	}
+	return key, nil
 }
 
 func validateAuthConfig(auth Auth) error {

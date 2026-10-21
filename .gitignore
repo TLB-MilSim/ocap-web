@@ -37,3 +37,6 @@ ui/.vite/
 ui/dist/
 internal/frontend/dist/*
 !internal/frontend/dist/.gitkeep
+
+# Sign-in token key (created next to the database on first start; also by the settings tests)
+jwt.key

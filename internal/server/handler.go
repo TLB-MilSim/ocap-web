@@ -129,7 +129,7 @@ func NewHandler(
 		opt(&hdlr)
 	}
 
-	hdlr.jwt = NewJWTManager(setting.Secret, setting.Auth.SessionTTL)
+	hdlr.jwt = NewJWTManager(setting.jwtKey(), setting.Auth.SessionTTL)
 	hdlr.openIDCache = openid.NewSimpleDiscoveryCache()
 	hdlr.openIDNonceStore = openid.NewSimpleNonceStore()
 	hdlr.openIDVerifier = defaultOpenIDVerifier{}
@@ -336,11 +336,10 @@ func (h *Handler) StoreOperation(w http.ResponseWriter, r *http.Request) {
 		err    error
 	)
 
-	if secret != h.setting.Secret {
+	if !secretMatches(secret, h.setting.Secret) {
 		// Fall back to JWT Bearer token auth (admin UI uploads)
 		token := bearerToken(r)
-		claims := h.jwt.Claims(token)
-		if claims == nil || claims.Role != "admin" {
+		if !h.isAdmin(r, token) {
 			var reason string
 			if token != "" {
 				reason = "invalid or insufficient token"

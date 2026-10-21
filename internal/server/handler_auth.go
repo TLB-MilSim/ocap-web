@@ -34,6 +34,11 @@ func (defaultOpenIDVerifier) Verify(discoveryURL string, cache openid.DiscoveryC
 	return openid.Verify(discoveryURL, cache, nonceStore)
 }
 
+// secretMatches compares a shared secret in constant time.
+func secretMatches(got, want string) bool {
+	return subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
+}
+
 // bearerToken extracts the token from the Authorization: Bearer <token> header.
 func bearerToken(r *http.Request) string {
 	auth := r.Header.Get("Authorization")
@@ -43,8 +48,21 @@ func bearerToken(r *http.Request) string {
 	return ""
 }
 
+// steamLoginDisabled answers 404 when OCAP's own Steam login is off: in "tlb" mode
+// everyone signs in through the TLB suite instead.
+func (h *Handler) steamLoginDisabled(w http.ResponseWriter) bool {
+	if h.setting.Auth.Mode == "tlb" {
+		http.Error(w, "Steam login not enabled", http.StatusNotFound)
+		return true
+	}
+	return false
+}
+
 // SteamLogin redirects the user to Steam's OpenID login page.
 func (h *Handler) SteamLogin(w http.ResponseWriter, r *http.Request) {
+	if h.steamLoginDisabled(w) {
+		return
+	}
 	nonce, err := randomHex(16)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -77,6 +95,9 @@ func (h *Handler) SteamLogin(w http.ResponseWriter, r *http.Request) {
 // SteamCallback handles the return from Steam OpenID, verifies the response,
 // checks the allowlist, issues a JWT, and redirects to the frontend.
 func (h *Handler) SteamCallback(w http.ResponseWriter, r *http.Request) {
+	if h.steamLoginDisabled(w) {
+		return
+	}
 	// Verify nonce for CSRF protection
 	cookie, err := r.Cookie(cookieNonce)
 	if err != nil || cookie.Value == "" {
@@ -217,7 +238,14 @@ func (h *Handler) GetMe(c ContextNoBody) (MeResponse, error) {
 	}
 	resp := MeResponse{Authenticated: true}
 	if claims := h.jwt.Claims(token); claims != nil {
+		r := c.Request()
+		if !h.tlbAllows(r, claims.Subject, tlbPermMember) {
+			return MeResponse{Authenticated: false}, nil
+		}
 		resp.Role = claims.Role
+		if resp.Role == "admin" && !h.tlbAllows(r, claims.Subject, tlbPermAdmin) {
+			resp.Role = "viewer"
+		}
 		resp.SteamID = claims.Subject
 		resp.SteamName = claims.SteamName
 		resp.SteamAvatar = claims.SteamAvatar
@@ -269,15 +297,16 @@ func (h *Handler) Logout(c ContextNoBody) (any, error) {
 
 // requireViewer is middleware that enforces site-wide access control.
 // In "public" mode it passes all requests through. In all other modes
-// it requires a valid JWT with any role (viewer or admin).
+// it requires a valid JWT with any role (viewer or admin); in "tlb" mode
+// also a live TLB session with the member permission.
 func (h *Handler) requireViewer(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if h.setting.Auth.Mode == "public" {
 			next.ServeHTTP(w, r)
 			return
 		}
-		token := bearerToken(r)
-		if token == "" || h.jwt.Validate(token) != nil {
+		claims := h.jwt.Claims(bearerToken(r))
+		if claims == nil || !h.tlbAllows(r, claims.Subject, tlbPermMember) {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -285,17 +314,22 @@ func (h *Handler) requireViewer(next http.Handler) http.Handler {
 	})
 }
 
-// requireAdmin is middleware that checks for a valid JWT Bearer token with admin role.
+// requireAdmin is middleware that checks for a valid JWT Bearer token with admin role
+// (in "tlb" mode also a live TLB session with the ocap.edit permission).
 func (h *Handler) requireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := bearerToken(r)
-		claims := h.jwt.Claims(token)
-		if claims == nil || claims.Role != "admin" {
+		if !h.isAdmin(r, bearerToken(r)) {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// isAdmin reports whether token is a valid admin token for this request.
+func (h *Handler) isAdmin(r *http.Request, token string) bool {
+	claims := h.jwt.Claims(token)
+	return claims != nil && claims.Role == "admin" && h.tlbAllows(r, claims.Subject, tlbPermAdmin)
 }
 
 // extractSteamID extracts the Steam64 ID from a claimed OpenID URL.

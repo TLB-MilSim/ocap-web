@@ -219,7 +219,8 @@ func (h *Handler) mapToolEventStream(w http.ResponseWriter, r *http.Request) {
 	if token == "" {
 		token = r.URL.Query().Get("token")
 	}
-	if token == "" || h.jwt.Validate(token) != nil {
+	// Map Manager jobs are admin-only, like the rest of /api/v1/maptool.
+	if !h.isAdmin(r, token) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
