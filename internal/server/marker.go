@@ -210,6 +210,8 @@ func (r *RepoMarker) scanColor(scolor string) (color.Color, error) {
 		c = color.RGBA{0, 127, 0, 255}
 	case "civ", "civilian":
 		c = color.RGBA{102, 0, 127, 255}
+	case "virtual", "zeus", "logic":
+		c = color.RGBA{201, 162, 39, 255}
 	case "unconscious":
 		c = color.RGBA{255, 168, 26, 255}
 	default:
@@ -219,8 +221,12 @@ func (r *RepoMarker) scanColor(scolor string) (color.Color, error) {
 	return c, nil
 }
 
+// scanReadDir lists a directory for scanDir; tests replace it to simulate
+// an unreadable subdirectory.
+var scanReadDir = os.ReadDir
+
 func scanDir(dir string, files map[string]string) error {
-	entrys, err := os.ReadDir(dir)
+	entrys, err := scanReadDir(dir)
 	if err != nil {
 		return err
 	}
