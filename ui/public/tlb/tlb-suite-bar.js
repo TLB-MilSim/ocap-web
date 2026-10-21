@@ -60,6 +60,12 @@
     }
   }
 
+  // Signed in to TLB, but the account isn't finished yet (Steam not linked): the
+  // sites can't sign the member in until it is. Display only, set by the Login Service.
+  function setupPending() {
+    return /(?:^|;\s*)tlb_setup=/.test(document.cookie);
+  }
+
   function authUrl(path, returnTo) {
     var url = (isLive ? AUTH.live : AUTH.local) + path;
     return returnTo ? url + '?returnUrl=' + encodeURIComponent(returnTo) : url;
@@ -115,6 +121,8 @@
 
   var ICON_DISCORD = '<path d="M8.5 15.5c2.3 1 4.7 1 7 0M7 7.5c3.3-1.3 6.7-1.3 10 0 1.6 2.4 2.4 5 2.3 8-1.2 1-2.5 1.6-3.8 2l-1-1.6M7 7.5c-1.6 2.4-2.4 5-2.3 8 1.2 1 2.5 1.6 3.8 2l1-1.6"/><circle cx="9.5" cy="12" r=".8"/><circle cx="14.5" cy="12" r=".8"/>';
 
+  var ICON_SETUP = '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5M12 16.2v.3"/>';
+
   var user = signedInUser();
   var account;
   if (user) {
@@ -133,6 +141,11 @@
           '<a role="menuitem" href="' + escape(authUrl('logout', location.href)) + '">Sign out</a>' +
         '</div>' +
       '</div>';
+  } else if (setupPending()) {
+    // /login resumes the unfinished setup (Steam linking), then returns here.
+    account = '<a class="tlb-sb-signin tlb-sb-setup" href="' + escape(authUrl('login', location.href)) + '"' +
+      ' title="One step left: link your Steam account to use the TLB sites">' +
+      svg(ICON_SETUP, 16) + '<span>Finish setup</span></a>';
   } else {
     account = '<a class="tlb-sb-signin" href="' + escape(authUrl('login', location.href)) + '">' + svg(ICON_DISCORD, 16) + '<span>Sign in</span></a>';
   }

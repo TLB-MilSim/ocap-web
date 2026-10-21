@@ -133,6 +133,9 @@
   text-transform: uppercase;
 }
 .tlb-sb .tlb-sb-signin:hover { color: #fff; background: #4752C4; }
+/* Signed in, but the account still needs its Steam link */
+.tlb-sb .tlb-sb-setup { color: #1A1612; background: var(--amber, #F2A03D); }
+.tlb-sb .tlb-sb-setup:hover { color: #1A1612; background: var(--amber-bright, #FFB559); }
 .tlb-sb-account { position: relative; }
 .tlb-sb .tlb-sb-user {
   all: unset;
@@ -197,6 +200,7 @@
   .tlb-sb-site { display: none; }
   .tlb-sb-user-name, .tlb-sb .tlb-sb-signin span { display: none; }
   .tlb-sb .tlb-sb-signin { padding: 0 .55rem; }
+  .tlb-sb .tlb-sb-setup span { display: inline; }
   .tlb-sb .tlb-sb-menu { display: inline-grid; }
   .tlb-sb-nav {
     display: none;
