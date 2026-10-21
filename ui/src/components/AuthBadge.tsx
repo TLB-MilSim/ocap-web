@@ -29,7 +29,10 @@ export function AuthBadge(): JSX.Element {
     }
   };
 
+  // TLB suite sign-in: the TLB top bar already shows who is signed in and holds
+  // Sign out, so the badge only appears for sign-in errors.
   return (
+    <Show when={authMode() !== "tlb" || !authenticated()}>
     <Show
       when={authenticated()}
       fallback={
@@ -79,6 +82,7 @@ export function AuthBadge(): JSX.Element {
           <LogOutIcon />
         </button>
       </>
+    </Show>
     </Show>
   );
 }

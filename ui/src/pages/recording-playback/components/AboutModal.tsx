@@ -15,6 +15,8 @@ export interface AboutModalProps {
   onClose: () => void;
   extensionVersion?: Accessor<string | undefined>;
   addonVersion?: Accessor<string | undefined>;
+  /** Show the language picker (default true; off with the TLB suite sign-in, which is English only). */
+  showLanguage?: boolean;
 }
 
 export function AboutModal(props: AboutModalProps): JSX.Element {
@@ -94,6 +96,7 @@ export function AboutModal(props: AboutModalProps): JSX.Element {
             </div>
 
             {/* Language */}
+            <Show when={props.showLanguage !== false}>
             <div class={styles.section}>
               <div class={styles.sectionLabel}>{t("language")}</div>
               <select
@@ -107,6 +110,7 @@ export function AboutModal(props: AboutModalProps): JSX.Element {
                 </For>
               </select>
             </div>
+            </Show>
           </div>
         </div>
       </div>

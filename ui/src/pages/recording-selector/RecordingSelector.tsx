@@ -27,7 +27,7 @@ export function RecordingSelector(): JSX.Element {
   const navigate = useNavigate();
   const api = new ApiClient();
   const customize = useCustomize();
-  const { authenticated, isAdmin, authError, dismissAuthError } = useAuth();
+  const { authenticated, isAdmin, authMode, authError, dismissAuthError } = useAuth();
 
   // State
   const [showUpload, setShowUpload] = createSignal(false);
@@ -338,9 +338,10 @@ export function RecordingSelector(): JSX.Element {
                 </Show>
               </div>
 
+              {/* Language Selector (not with the TLB suite sign-in: TLB is English only) */}
+              <Show when={authMode() !== "tlb"}>
               <div class={styles.divider} />
 
-              {/* Language Selector */}
               <div class={styles.langSelector}>
                 <button class={styles.langButton} onClick={() => setLangOpen(!langOpen())}>
                   <span class={styles.langFlag}>{LOCALE_LABELS[locale()]?.flag}</span>
@@ -372,8 +373,11 @@ export function RecordingSelector(): JSX.Element {
                   </div>
                 </Show>
               </div>
+              </Show>
 
-              <div class={styles.divider} />
+              <Show when={authMode() !== "tlb" || isAdmin()}>
+                <div class={styles.divider} />
+              </Show>
 
               <div class={styles.adminArea}>
                 <AuthBadge />

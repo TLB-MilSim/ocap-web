@@ -61,7 +61,7 @@ export function RecordingPlayback(): JSX.Element {
   const navigate = useNavigate();
   const location = useLocation<LocationState>();
   const { t } = useI18n();
-  const { authenticated } = useAuth();
+  const { authenticated, authMode } = useAuth();
   const api = new ApiClient();
   const rendererParam = new URLSearchParams(window.location.search).get("renderer");
   const renderer: MapRenderer = rendererParam === "dom"
@@ -363,6 +363,7 @@ export function RecordingPlayback(): JSX.Element {
           onClose={() => setAboutOpen(false)}
           extensionVersion={extensionVersion}
           addonVersion={addonVersion}
+          showLanguage={authMode() !== "tlb"}
         />
         <FollowIndicator />
         <Show when={authenticated() && blacklist().size > 0}>

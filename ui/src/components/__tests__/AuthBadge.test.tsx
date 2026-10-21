@@ -173,4 +173,25 @@ describe("AuthBadge", () => {
     fireEvent.click(getByText("x"));
     expect(authState.dismissAuthError).toHaveBeenCalledOnce();
   });
+
+  it("renders nothing when signed in with the TLB suite (the TLB top bar shows the account)", () => {
+    authState.authMode.mockReturnValue("tlb");
+    authState.authenticated.mockReturnValue(true);
+    authState.isAdmin.mockReturnValue(true);
+    authState.steamName.mockReturnValue("CPT W. Fosse");
+
+    const { queryByText, queryByTitle } = render(() => <I18nProvider locale="en"><AuthBadge /></I18nProvider>);
+    expect(queryByText("CPT W. Fosse")).toBeNull();
+    expect(queryByText("ADMIN")).toBeNull();
+    expect(queryByTitle("Sign out")).toBeNull();
+  });
+
+  it("still shows sign-in errors in TLB suite mode", () => {
+    authState.authMode.mockReturnValue("tlb");
+    authState.authenticated.mockReturnValue(false);
+    authState.authError.mockReturnValue("You are not on the allowlist. Contact an admin for access.");
+
+    const { getByText } = render(() => <I18nProvider locale="en"><AuthBadge /></I18nProvider>);
+    expect(getByText(/not on the allowlist/)).toBeDefined();
+  });
 });

@@ -14,6 +14,7 @@ function renderAboutModal(
     open?: boolean;
     extensionVersion?: string;
     addonVersion?: string;
+    showLanguage?: boolean;
   } = {},
 ) {
   const [open, setOpen] = createSignal(overrides.open ?? true);
@@ -33,6 +34,7 @@ function renderAboutModal(
         onClose={onClose}
         extensionVersion={extensionVersion}
         addonVersion={addonVersion}
+        showLanguage={overrides.showLanguage}
       />
     </I18nProvider>
   ));
@@ -139,5 +141,11 @@ describe("AboutModal", () => {
 
     // The addon version label should NOT appear
     expect(screen.queryByText(/Addon version/)).toBeNull();
+  });
+
+  it("hides the language picker when showLanguage is false (TLB suite sign-in)", () => {
+    renderAboutModal({ showLanguage: false });
+
+    expect(screen.queryByTestId("language-select")).toBeNull();
   });
 });
