@@ -1,3 +1,166 @@
+<p align="center"><img src="ui/public/tlb/tlb-favicon.png" width="72" alt="TLB MilSim"></p>
+
+<h1 align="center">TLB MilSim · OCAP</h1>
+
+<p align="center">Replays of past operations: every unit, vehicle and engagement as it happened.</p>
+
+> [!NOTE]
+> **This is TLB MilSim's fork of [OCAP2/web](https://github.com/OCAP2/web).** We changed it to match the TLB style and workflow: the TLB look and top bar, a `tlb` sign-in mode that uses the shared TLB sign-in, a hardened Docker setup and a weekly upstream check.
+>
+> Our work is on the **`tlb`** branch (the default); `main` follows upstream unchanged. The original project's README is kept [below](#original-readme).
+
+## Part of the TLB MilSim suite
+
+The Lost Battalion's web tools are five repositories that run together as one system: one sign-in, one top bar, one look. [HubTLB](https://github.com/TLB-MilSim/HubTLB) ties them together and runs them with Docker Compose.
+
+| Part | Repository | What it does | Live address | Local |
+|---|---|---|---|---|
+| Hub | [TLB-MilSim/HubTLB](https://github.com/TLB-MilSim/HubTLB) (private) | Launcher page, shared top bar and theme, the Docker Compose stack | hub.tlbmilsim.com | `localhost:8000` |
+| Sign-in | [TLB-MilSim/TLB-SSO](https://github.com/TLB-MilSim/TLB-SSO) (private) | TLB Login Service: one Discord sign-in for every site | auth.tlbmilsim.com | `localhost:5100` |
+| cTab | [TLB-MilSim/cTab](https://github.com/TLB-MilSim/cTab), fork of [jetelain/cTab](https://github.com/jetelain/cTab) | Your in-game cTab on a phone, tablet or second monitor | ctab.tlbmilsim.com | `localhost:5010` |
+| Tac Map | [TLB-MilSim/TLB-Tac-Map](https://github.com/TLB-MilSim/TLB-Tac-Map) (private) | Plan operations together on a live map | tacmap.tlbmilsim.com | `localhost:8080` |
+| **OCAP** | **[TLB-MilSim/ocap-web](https://github.com/TLB-MilSim/ocap-web)** (this repository), fork of [OCAP2/web](https://github.com/OCAP2/web) | Replays of past operations | ocap.tlbmilsim.com | `localhost:5000` |
+
+The live addresses are where the sites go when the suite is deployed; locally each one runs on its own port.
+
+## What we changed
+
+Where possible the changes are in files of our own (`handler_tlb.go`, `ui/public/tlb/`), so upstream updates merge cleanly.
+
+**TLB look**
+- `ui/public/tlb/`: the shared TLB top bar (`tlb-suite-bar.js/.css`) and favicon. The master copies are in HubTLB (`hub/suite/`), and `hub/sync-suite.ps1` copies them here. Don't edit them here.
+- `ui/index.html`: loads the TLB fonts, the top bar and the favicon.
+- `ui/src/styles/variables.css`: maps the TLB colours onto OCAP's own colour variables, so every page follows the TLB theme (light and dark).
+- `ui/src/pages/recording-selector/`: the recordings page uses the TLB layout (a centred column like the other TLB sites) and a phone layout for the recordings table.
+- Small style fixes so OCAP's pages sit under the top bar: `base.css`, `leaflet.css`, `AuthBadge`, `LoadingTransition`, `AdminPage`, `MapManager`.
+- The title and subtitle (`OCAP`, `TLB MilSim · Operation replays`, tab title `TLB MilSim · OCAP`) come from the `customize` settings, not code.
+
+**`tlb` sign-in mode** (the [TLB Login Service](https://github.com/TLB-MilSim/TLB-SSO))
+- `internal/server/handler_tlb.go`:
+  - `GET /api/v1/auth/tlb` exchanges the shared TLB session (`tlb_session` cookie, an ES256 JWT) for OCAP's own sign-in token. A signed-out visitor is sent to the TLB sign-in page and back.
+  - The session is checked with the Login Service's public key (fetched from its JWKS, refetched at most every 30 seconds, cached keys trusted for at most 24 hours), plus issuer, audience (`tlb-suite`) and expiry.
+  - Every viewer and admin decision also asks the Login Service's live `/verify` endpoint, cached for 30 seconds per session. Signing out, a block or a removed Discord role reaches OCAP within 30 seconds. The suite session must belong to the same person as OCAP's token. If the Login Service can't be reached, there is no access (fails closed).
+  - OCAP's token is issued from the live permissions, never outlives the suite session, and is returned in the URL fragment (`#auth_token=`), which browsers never send to servers or write to logs.
+- `internal/server/setting.go`: the `auth.tlb` settings and `auth.jwtSecret`. OCAP signs its tokens with a key of its own, never the upload `secret`: `auth.jwtSecret`, or a random key in `jwt.key` next to the database, created on first start.
+- `internal/server/handler_auth.go`: in `tlb` mode, OCAP's own Steam login is switched off (404) and `adminSteamIds` is not used.
+- `internal/server/jwt.go`: tokens must have an expiry and use HS256.
+- `internal/server/handler.go`, `handler_stream.go`: the upload and streaming secrets are compared in constant time; admin uploads from the browser are checked live too.
+- `internal/server/handler_maptool.go`: the Map Manager's event stream needs an admin, like the rest of the Map Manager.
+- `ui/src/hooks/useAuth.tsx`, `ui/src/data/apiClient.ts`: no OCAP login screen in `tlb` mode. The web app goes through `/api/v1/auth/tlb`, reads the token from the URL fragment, signs in again when the TLB session has changed, and **Sign out** signs out of the whole suite.
+- Tests: `internal/server/handler_tlb_test.go` (fake Login Service with JWKS and `/verify`).
+
+**Repository**
+- `.dockerignore`: databases, logs, keys and `setting.json` never end up in the image build.
+- `.gitattributes`: shell scripts keep LF line endings, so `docker/entrypoint.sh` works when built on Windows.
+- `.gitignore`: `jwt.key`.
+- `.github/workflows/upstream-sync.yml`: the weekly upstream check (see [Taking upstream updates](#taking-upstream-updates)).
+- Upstream's `Build` workflow (publishes Docker images) is disabled on this fork. The test workflows (`Go`, `UI`) still run on PRs.
+
+## Run it
+
+OCAP runs as the `ocap` service in [HubTLB](https://github.com/TLB-MilSim/HubTLB)'s Docker Compose stack, together with the hub, the Login Service and cTab. Clone this repository into HubTLB's `OCAP/` folder, with LF line endings:
+
+```bash
+git clone -b tlb -c core.autocrlf=false https://github.com/TLB-MilSim/ocap-web.git OCAP
+```
+
+Then, from HubTLB, `docker compose up -d --build ocap`. The site is on http://localhost:5000.
+
+In the stack, OCAP runs as the image's normal user (uid 1000) with a read-only filesystem. Everything it uses at runtime is in HubTLB's `ocap-server/` folder, laid out like a release install:
+
+```
+ocap-server/
+  setting.json   upload secret, titles, sign-in settings (mounted read-only)
+  data/          recordings (*.json.gz) and their converted folders
+  maps/          one folder per world, e.g. maps/lythium (map.json, styles/, tiles/)
+  db/            database (data.db) and the token key (jwt.key)
+```
+
+- **Recordings:** the OCAP Arma addon uploads them with the `secret` from `setting.json`.
+- **Map Manager:** set the build argument `VARIANT: full` in HubTLB's `compose.yaml` to get the admin Map Manager (GDAL, tippecanoe). The build is much slower.
+- **Logs:** `docker compose logs ocap`. HubTLB sets `OCAP_LOGGER=false`, because the filesystem is read-only.
+
+## Configuration
+
+The `tlb` sign-in part of `setting.json` (environment variables such as `OCAP_AUTH_TLB_VERIFYURL` override the file):
+
+```json
+"auth": {
+  "mode": "tlb",
+  "sessionTTL": "12h",
+  "tlb": {
+    "publicUrl": "http://localhost:5100/",
+    "jwksUrl": "http://auth:8080/.well-known/jwks.json",
+    "verifyUrl": "http://auth:8080/verify"
+  }
+}
+```
+
+| Setting | Meaning |
+|---|---|
+| `auth.mode` | `tlb` for the shared TLB sign-in. The upstream modes (`public`, `password`, `steam`, `steamAllowlist`) still work. |
+| `auth.tlb.publicUrl` | The Login Service's public address, also the token issuer. Live: `https://auth.tlbmilsim.com/`. Required in `tlb` mode. |
+| `auth.tlb.jwksUrl` | Where OCAP fetches the signing keys. Default: `<publicUrl>.well-known/jwks.json`. |
+| `auth.tlb.verifyUrl` | The live session check. Default: `<publicUrl>verify`. HubTLB sets `OCAP_AUTH_TLB_VERIFYURL=http://auth:8080/verify`. |
+| `auth.jwtSecret` | Optional key for OCAP's own tokens. Empty = a random key in `jwt.key` next to the database. Deleting it signs everyone out of OCAP. |
+| `auth.sessionTTL` | Longest life of an OCAP token; it never outlives the TLB session it came from. |
+
+HubTLB has a complete example in `ocap-server/setting.example.json`. All other settings are upstream's (see the original README below).
+
+## Sign-in and permissions
+
+The Login Service maps Discord roles to permissions; OCAP only checks the permission names.
+
+| Permission | Discord role | In OCAP |
+|---|---|---|
+| `member` | `605409199219933194`, or any role that gives a TLB permission | Watch replays (viewer) |
+| `ocap.edit` | HQ `563814811843166250` | Admin pages: upload, edit and delete recordings, Map Manager |
+
+## Development
+
+Requires [Go 1.26+](https://go.dev/dl/) (the image builds with Go 1.27) and [Node.js 24+](https://nodejs.org/).
+
+```bash
+go vet ./... && go test ./...
+cd ui && npm ci && npm test && npx tsc --noEmit
+```
+
+On Windows, run the Go tests in a container (the SQLite driver needs cgo), for example with `golang:1.27` as a non-root user. Keep `core.autocrlf=false` in this clone.
+
+## Taking upstream updates
+
+`origin` is this fork and `upstream` is [OCAP2/web](https://github.com/OCAP2/web). In a clone, set `upstream` up as fetch-only so nothing is pushed there by mistake:
+
+```bash
+git remote add upstream https://github.com/OCAP2/web.git
+git remote set-url --push upstream no-push
+```
+
+**Weekly check:** the *Upstream sync* workflow runs every Monday at 06:00 UTC, and can also be run from the Actions tab.
+- **No new commits:** nothing happens.
+- **New commits that merge cleanly:** it runs the Go and UI tests on the merge, pushes the `upstream-sync` branch and opens an issue with a one-click **Create the PR** link (the TLB-MilSim organization doesn't let Actions open PRs).
+- **New commits that change upstream's workflow files:** GitHub doesn't let Actions push those, so the issue lists the commands to merge from your clone.
+- **Merge conflicts:** the issue lists the conflicting files.
+
+Nothing is merged into `tlb` automatically. The workflow never runs upstream's code with write access: the merge, the tests and the push run in separate jobs.
+
+**By hand:**
+
+```bash
+git fetch upstream
+git switch -c update/upstream origin/tlb
+git merge upstream/main          # resolve conflicts, test
+git push -u origin update/upstream
+```
+
+Then open a PR into `tlb` and merge it with a merge commit (not squash), so upstream's history stays intact. If `README.md` conflicts, keep this TLB part at the top and take upstream's version below the divider.
+
+---
+
+<a id="original-readme"></a>
+
+*Everything below is the original project's README ([OCAP2/web](https://github.com/OCAP2/web)), unchanged.*
+
 # OCAP Web component
 
 ![Go Coverage](https://raw.githubusercontent.com/OCAP2/web/badges/.badges/main/coverage.svg)
