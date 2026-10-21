@@ -1,7 +1,13 @@
 # TLB fork: weekly check for new OCAP2/web commits.
-# Merges upstream into a branch off `tlb`, runs the Go and UI tests, then opens (or updates)
-# a PR into `tlb`. On a merge conflict it opens an issue listing the conflicting files instead.
+# Merges upstream into a branch off `tlb`, builds and tests it, then opens (or updates) a PR
+# into `tlb`, or an issue with a one-click PR link when the organization doesn't let Actions
+# open PRs. On a merge conflict it opens an issue listing the conflicting files instead.
 # Nothing is merged into `tlb` automatically.
+#
+# The jobs are split so that upstream's code never runs with write access:
+#   merge    read-only token, runs no project code; hands the merged branch on as a git bundle
+#   test     read-only token, no stored credentials; builds and tests upstream's code
+#   publish  write token, runs no project code; pushes the branch and opens the PR or issue
 name: Upstream sync
 
 on:
@@ -9,26 +15,33 @@ on:
     - cron: "0 6 * * 1" # Mondays 06:00 UTC
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
+permissions: {}
 
 concurrency: upstream-sync
 
+env:
+  UPSTREAM: https://github.com/OCAP2/web.git
+  UPSTREAM_NAME: OCAP2/web
+  UPSTREAM_BRANCH: main
+  SYNC_BRANCH: upstream-sync
+
 jobs:
-  sync:
+  merge:
     runs-on: ubuntu-latest
-    env:
-      UPSTREAM: https://github.com/OCAP2/web.git
-      UPSTREAM_BRANCH: main
-      SYNC_BRANCH: upstream-sync
-      GH_TOKEN: ${{ github.token }}
+    permissions:
+      contents: read
+    outputs:
+      result: ${{ steps.merge.outputs.result }}
+      new: ${{ steps.merge.outputs.new }}
+      base: ${{ steps.merge.outputs.base }}
+      upstream_sha: ${{ steps.merge.outputs.upstream_sha }}
+      bundle_sha256: ${{ steps.merge.outputs.bundle_sha256 }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: tlb
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Merge upstream into a branch off tlb
         id: merge
@@ -37,68 +50,165 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add upstream "$UPSTREAM"
           git fetch --no-tags upstream "$UPSTREAM_BRANCH"
+          base=$(git rev-parse HEAD)
           new=$(git rev-list --count HEAD.."upstream/$UPSTREAM_BRANCH")
-          echo "new=$new" >> "$GITHUB_OUTPUT"
-          echo "upstream_sha=$(git rev-parse --short "upstream/$UPSTREAM_BRANCH")" >> "$GITHUB_OUTPUT"
+          {
+            echo "base=$base"
+            echo "new=$new"
+            echo "upstream_sha=$(git rev-parse --short "upstream/$UPSTREAM_BRANCH")"
+          } >> "$GITHUB_OUTPUT"
+          mkdir -p "$RUNNER_TEMP/sync"
           if [ "$new" = 0 ]; then echo "tlb already contains upstream/$UPSTREAM_BRANCH"; exit 0; fi
           git switch -c "$SYNC_BRANCH"
           if git merge --no-edit "upstream/$UPSTREAM_BRANCH"; then
             echo "result=merged" >> "$GITHUB_OUTPUT"
+            git bundle create "$RUNNER_TEMP/sync/sync.bundle" "$SYNC_BRANCH" "^$base"
+            echo "bundle_sha256=$(sha256sum "$RUNNER_TEMP/sync/sync.bundle" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
           else
             echo "result=conflict" >> "$GITHUB_OUTPUT"
-            git diff --name-only --diff-filter=U > "$RUNNER_TEMP/conflicts.txt"
+            git diff --name-only --diff-filter=U > "$RUNNER_TEMP/sync/conflicts.txt"
             git merge --abort
           fi
 
-      - uses: actions/setup-go@v5
-        if: steps.merge.outputs.result == 'merged'
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.merge.outputs.result != ''
+        with:
+          name: sync
+          path: ${{ runner.temp }}/sync/
+          retention-days: 7
+
+  test:
+    needs: merge
+    if: needs.merge.outputs.result == 'merged'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.merge.outputs.base }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sync
+          path: ${{ runner.temp }}/sync
+
+      - name: Check out the merged branch
+        run: |
+          git fetch "$RUNNER_TEMP/sync/sync.bundle" "$SYNC_BRANCH:$SYNC_BRANCH"
+          git switch "$SYNC_BRANCH"
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: actions/setup-node@v4
-        if: steps.merge.outputs.result == 'merged'
+          cache: false # nothing from upstream's code may land in a cache other runs restore
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
+          package-manager-cache: false
 
       - name: Test
-        id: test
-        if: steps.merge.outputs.result == 'merged'
-        continue-on-error: true
         run: |
           mkdir -p internal/frontend/dist && touch internal/frontend/dist/.keep
           go vet ./... && go test ./...
-          cd ui && npm ci && npm test && npm run build
+          cd ui && npm ci --ignore-scripts && npm test && npm run build
+
+  publish:
+    needs: [merge, test]
+    if: always() && needs.merge.outputs.result == 'merged'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NEW: ${{ needs.merge.outputs.new }}
+      UPSTREAM_SHA: ${{ needs.merge.outputs.upstream_sha }}
+      BUNDLE_SHA256: ${{ needs.merge.outputs.bundle_sha256 }}
+      TEST_RESULT: ${{ needs.test.result }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      COMPARE_URL: ${{ github.server_url }}/${{ github.repository }}/compare/tlb...upstream-sync?expand=1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.merge.outputs.base }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sync
+          path: ${{ runner.temp }}/sync
+
+      - name: Push the sync branch
+        id: push
+        run: |
+          echo "$BUNDLE_SHA256  $RUNNER_TEMP/sync/sync.bundle" | sha256sum -c -
+          git fetch "$RUNNER_TEMP/sync/sync.bundle" "$SYNC_BRANCH:refs/sync/new"
+          lease=""
+          if git fetch origin "refs/heads/$SYNC_BRANCH:refs/sync/old" 2>/dev/null; then
+            lease=$(git rev-parse refs/sync/old)
+            # Commits someone added to the branch by hand (not this workflow's merges) are never overwritten.
+            manual=$(git log --format=%an refs/sync/old ^refs/sync/new ^origin/tlb | grep -vxc "TLB upstream sync" || true)
+            if [ "$manual" != 0 ]; then
+              echo "kept=true" >> "$GITHUB_OUTPUT"
+              echo "::warning::$SYNC_BRANCH has $manual commit(s) added by hand; not replacing it"
+              exit 0
+            fi
+          fi
+          git push --force-with-lease="refs/heads/$SYNC_BRANCH:$lease" origin "refs/sync/new:refs/heads/$SYNC_BRANCH"
 
       - name: Open or update the sync PR
-        if: steps.merge.outputs.result == 'merged'
+        env:
+          KEPT: ${{ steps.push.outputs.kept }}
         run: |
-          git push --force origin "$SYNC_BRANCH"
-          status="✅ Go and UI tests passed"
-          [ "${{ steps.test.outcome }}" = "success" ] || status="❌ Tests failed: see the workflow run"
+          status="✅ Build and tests passed"
+          [ "$TEST_RESULT" = "success" ] || status="❌ Build or tests failed: see the workflow run"
+          [ "$KEPT" != "true" ] || status="⚠️ Not pushed: branch \`$SYNC_BRANCH\` has commits added by hand. Merge them first, or delete the branch so the next run recreates it."
+          title="Upstream sync: $NEW new $UPSTREAM_NAME commits"
           body=$(printf '%s\n\n%s\n\n%s\n%s\n' \
-            "Merges **${{ steps.merge.outputs.new }}** new commits from upstream \`OCAP2/web@${{ steps.merge.outputs.upstream_sha }}\` into \`tlb\`." \
-            "$status ([run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}))" \
-            "Before merging, check that the TLB theme, top bar and \`tlb\` sign-in still work." \
+            "Merges **$NEW** new commits from upstream \`$UPSTREAM_NAME@$UPSTREAM_SHA\` into \`tlb\`." \
+            "$status ([run]($RUN_URL))" \
+            "Before merging, check that the TLB theme, top bar and shared sign-in still work." \
             "Opened by the weekly *Upstream sync* workflow; it updates this PR until it is merged.")
           number=$(gh pr list --head "$SYNC_BRANCH" --base tlb --state open --json number -q '.[0].number')
           if [ -n "$number" ]; then
-            gh pr edit "$number" --title "Upstream sync: ${{ steps.merge.outputs.new }} new OCAP2/web commits" --body "$body"
-          elif ! gh pr create --base tlb --head "$SYNC_BRANCH" --title "Upstream sync: ${{ steps.merge.outputs.new }} new OCAP2/web commits" --body "$body"; then
+            gh pr edit "$number" --title "$title" --body "$body"
+          elif ! gh pr create --base tlb --head "$SYNC_BRANCH" --title "$title" --body "$body"; then
             # The organization doesn't let GitHub Actions open PRs: open an issue with a one-click link instead.
-            title="Upstream sync: new OCAP2/web commits ready"
-            link="${{ github.server_url }}/${{ github.repository }}/compare/tlb...$SYNC_BRANCH?expand=1"
-            issue_body=$(printf '%s\n\n**[Create the PR](%s)** (branch %s, updated weekly)\n' "$body" "$link" "$SYNC_BRANCH")
+            title="Upstream sync: new $UPSTREAM_NAME commits ready"
+            issue_body=$(printf '%s\n\n**[Create the PR](%s)** (branch %s, updated weekly)\n' "$body" "$COMPARE_URL" "$SYNC_BRANCH")
             number=$(gh issue list --state open --search "\"$title\" in:title" --json number -q '.[0].number')
             if [ -n "$number" ]; then gh issue comment "$number" --body "$issue_body"; else gh issue create --title "$title" --body "$issue_body"; fi
           fi
 
+  report-conflict:
+    needs: merge
+    if: needs.merge.outputs.result == 'conflict'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      NEW: ${{ needs.merge.outputs.new }}
+      UPSTREAM_SHA: ${{ needs.merge.outputs.upstream_sha }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sync
+          path: ${{ runner.temp }}/sync
+
       - name: Report a merge conflict
-        if: steps.merge.outputs.result == 'conflict'
         run: |
-          title="Upstream sync: merge conflict with OCAP2/web"
+          # File names come from upstream: keep plain path characters only, at most 100 lines.
+          # shellcheck disable=SC2016 # the backticks are Markdown
+          files=$(head -n 100 "$RUNNER_TEMP/sync/conflicts.txt" | LC_ALL=C sed 's|[^A-Za-z0-9._/ +-]|_|g; s/^/- `/; s/$/`/')
+          title="Upstream sync: merge conflict with $UPSTREAM_NAME"
           body=$(printf '%s\n\n%s\n\n%s\n' \
-            "Merging upstream \`OCAP2/web@${{ steps.merge.outputs.upstream_sha }}\` (${{ steps.merge.outputs.new }} new commits) into \`tlb\` conflicts in:" \
-            "$(sed 's/^/- `/; s/$/`/' "$RUNNER_TEMP/conflicts.txt")" \
-            "Resolve locally: \`git fetch upstream && git switch -c update/upstream tlb && git merge upstream/main\`, fix, test, then open a PR into \`tlb\`.")
+            "Merging upstream \`$UPSTREAM_NAME@$UPSTREAM_SHA\` ($NEW new commits) into \`tlb\` conflicts in:" \
+            "$files" \
+            "Resolve locally: \`git fetch upstream && git switch -c update/upstream tlb && git merge upstream/$UPSTREAM_BRANCH\`, fix, test, then open a PR into \`tlb\`.")
           number=$(gh issue list --state open --search "\"$title\" in:title" --json number -q '.[0].number')
           if [ -n "$number" ]; then gh issue comment "$number" --body "$body"; else gh issue create --title "$title" --body "$body"; fi
           exit 1
