@@ -11,7 +11,7 @@
 
 ## Part of the TLB MilSim suite
 
-The Lost Battalion's web tools are five repositories that run together as one system: one sign-in, one top bar, one look. [HubTLB](https://github.com/TLB-MilSim/HubTLB) ties them together and runs them with Docker Compose.
+The Lost Battalion's web tools are six repositories that run together as one system: one sign-in, one top bar, one look. [HubTLB](https://github.com/TLB-MilSim/HubTLB) ties them together and runs them with Docker Compose.
 
 | Part | Repository | What it does | Live address | Local |
 |---|---|---|---|---|
@@ -19,6 +19,7 @@ The Lost Battalion's web tools are five repositories that run together as one sy
 | Sign-in | [TLB-MilSim/TLB-SSO](https://github.com/TLB-MilSim/TLB-SSO) (private) | TLB Login Service: one Discord sign-in for every site | auth.tlbmilsim.com | `localhost:5100` |
 | cTab | [TLB-MilSim/cTab](https://github.com/TLB-MilSim/cTab), fork of [jetelain/cTab](https://github.com/jetelain/cTab) | Your in-game cTab on a phone, tablet or second monitor | ctab.tlbmilsim.com | `localhost:5010` |
 | Tac Map | [TLB-MilSim/TLB-Tac-Map](https://github.com/TLB-MilSim/TLB-Tac-Map) (private) | Plan operations together on a live map | tacmap.tlbmilsim.com | `localhost:8080` |
+| Board | [TLB-MilSim/TLB-Board](https://github.com/TLB-MilSim/TLB-Board) (private) | Plan together on a shared whiteboard: WARNOs, CONOPs, overlays, briefs | board.tlbmilsim.com | `localhost:5300` |
 | **OCAP** | **[TLB-MilSim/ocap-web](https://github.com/TLB-MilSim/ocap-web)** (this repository), fork of [OCAP2/web](https://github.com/OCAP2/web) | Replays of past operations | ocap.tlbmilsim.com | `localhost:5000` |
 
 The live addresses are where the sites go when the suite is deployed; locally each one runs on its own port.

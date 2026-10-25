@@ -12,7 +12,7 @@
  *     <script src="/tlb/tlb-suite-bar.js" data-app="ctab"></script>
  *
  * Attributes on the script tag:
- *   data-app          which app this page belongs to: hub | ctab | tacmap | ocap
+ *   data-app          which app this page belongs to: hub | ctab | tacmap | board | ocap
  *   data-theme-owner  "app" when the app applies its own theme on load (Tac Map);
  *                     otherwise the bar applies the saved theme itself.
  *   data-theme-toggle "off" hides the dark/light button, for an app that has
@@ -36,6 +36,7 @@
     { id: 'hub', label: 'Hub', live: 'https://hub.tlbmilsim.com/', local: 'http://localhost:8000/' },
     { id: 'ctab', label: 'cTab', live: 'https://ctab.tlbmilsim.com/', local: 'http://localhost:5010/' },
     { id: 'tacmap', label: 'Tac Map', live: 'https://tacmap.tlbmilsim.com/', local: 'http://localhost:8080/' },
+    { id: 'board', label: 'Board', live: 'https://board.tlbmilsim.com/', local: 'http://localhost:5300/' },
     { id: 'ocap', label: 'OCAP', live: 'https://ocap.tlbmilsim.com/', local: 'http://localhost:5000/' }
   ];
   var SITE = { label: 'tlbmilsim.com', href: 'https://tlbmilsim.com/' };
