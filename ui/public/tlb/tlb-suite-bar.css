@@ -194,7 +194,7 @@
 .tlb-sb-account-menu a:hover { color: var(--text, #EDEAE4); background: var(--surface-hover, #221F1B); }
 
 /* Phones: links move into a drop-down panel */
-@media (max-width: 760px) {
+@media (max-width: 1040px) {
   .tlb-sb { gap: .75rem; padding: 0 .5rem 0 1rem; }
   .tlb-sb-brand { border-right: 0; padding-right: 0; }
   .tlb-sb-site { display: none; }

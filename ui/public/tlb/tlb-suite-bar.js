@@ -1,5 +1,6 @@
 /*
- * TLB suite bar — the shared top navigation for hub, cTab, Tac Map and OCAP.
+ * TLB suite bar — the shared top navigation for hub, docs, cTab, Tac Map, Board and OCAP.
+ * The panel draws the same links in its own style (panel/templates/_suite_bar.html).
  *
  * Canonical copy lives in hub/suite/. Apps get a copy via hub/sync-suite.ps1
  * (Tac Map's Content-Security-Policy only allows its own scripts).
@@ -12,7 +13,7 @@
  *     <script src="/tlb/tlb-suite-bar.js" data-app="ctab"></script>
  *
  * Attributes on the script tag:
- *   data-app          which app this page belongs to: hub | ctab | tacmap | board | ocap
+ *   data-app          which app this page belongs to: hub | panel | docs | ctab | tacmap | board | ocap
  *   data-theme-owner  "app" when the app applies its own theme on load (Tac Map);
  *                     otherwise the bar applies the saved theme itself.
  *   data-theme-toggle "off" hides the dark/light button, for an app that has
@@ -34,6 +35,8 @@
 
   var APPS = [
     { id: 'hub', label: 'Hub', live: 'https://hub.tlbmilsim.com/', local: 'http://localhost:8000/' },
+    { id: 'panel', label: 'Panel', live: 'https://panel.tlbmilsim.com/', local: 'https://panel.tlbmilsim.com/' },
+    { id: 'docs', label: 'Docs', live: 'https://docs.tlbmilsim.com/', local: 'https://docs.tlbmilsim.com/' },
     { id: 'ctab', label: 'cTab', live: 'https://ctab.tlbmilsim.com/', local: 'http://localhost:5010/' },
     { id: 'tacmap', label: 'Tac Map', live: 'https://tacmap.tlbmilsim.com/', local: 'http://localhost:8080/' },
     { id: 'board', label: 'Board', live: 'https://board.tlbmilsim.com/', local: 'http://localhost:5300/' },
